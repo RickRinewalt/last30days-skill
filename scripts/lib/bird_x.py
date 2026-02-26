@@ -272,7 +272,7 @@ def search_x(
 
 def search_handles(
     handles: List[str],
-    topic: str,
+    topic: Optional[str],
     from_date: str,
     count_per: int = 5,
 ) -> List[Dict[str, Any]]:
@@ -283,7 +283,7 @@ def search_handles(
 
     Args:
         handles: List of X handles to search (without @)
-        topic: Search topic (core subject, not full verbose query)
+        topic: Search topic (core subject), or None for unfiltered search
         from_date: Start date (YYYY-MM-DD)
         count_per: Results to request per handle
 
@@ -291,11 +291,14 @@ def search_handles(
         List of raw item dicts (same format as parse_bird_response output).
     """
     all_items = []
-    core_topic = _extract_core_subject(topic)
+    core_topic = _extract_core_subject(topic) if topic else None
 
     for handle in handles:
         handle = handle.lstrip("@")
-        query = f"from:{handle} {core_topic} since:{from_date}"
+        if core_topic:
+            query = f"from:{handle} {core_topic} since:{from_date}"
+        else:
+            query = f"from:{handle} since:{from_date}"
 
         cmd = [
             "node", str(_BIRD_SEARCH_MJS),

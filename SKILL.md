@@ -81,6 +81,31 @@ This text MUST appear before you call any tools. It confirms to the user that yo
 
 ---
 
+## Step 0.5: Resolve X Handle (if topic is a person/brand)
+
+If TOPIC looks like a **person, creator, brand, or specific account** (1-3 words, proper noun - e.g., "Dor Brothers", "Jason Calacanis", "Linus Ekenstam"), do ONE quick WebSearch before running the script:
+
+```
+WebSearch("{TOPIC} X twitter handle")
+```
+
+From the results, extract their X/Twitter handle. Look for:
+- Profile URLs like `x.com/{handle}` or `twitter.com/{handle}`
+- Mentions like "@handle" in bios, articles, or social profiles
+- "Follow @handle on X" patterns
+
+If you find a clear, unambiguous handle, you'll pass it to the script as `--x-handle={handle}` (without the @). This lets the script search that account's posts directly - finding content they posted that doesn't mention their own name.
+
+**Skip this step if:**
+- TOPIC is clearly not an entity (e.g., "best rap songs 2026", "how to use Docker")
+- TOPIC already contains @ (user provided the handle directly)
+- Using `--quick` depth
+- You're unsure - the script works fine without it
+
+Store: `RESOLVED_HANDLE = {handle or empty}`
+
+---
+
 ## Research Execution
 
 **Step 1: Run the research script (FOREGROUND — do NOT background this)**
@@ -103,7 +128,7 @@ if [ -z "${SKILL_ROOT:-}" ]; then
   exit 1
 fi
 
-python3 "${SKILL_ROOT}/scripts/last30days.py" "$ARGUMENTS" --emit=compact
+python3 "${SKILL_ROOT}/scripts/last30days.py" "$ARGUMENTS" --emit=compact  # Add --x-handle=HANDLE if RESOLVED_HANDLE is set
 ```
 
 Use a **timeout of 300000** (5 minutes) on the Bash call. The script typically takes 1-3 minutes.

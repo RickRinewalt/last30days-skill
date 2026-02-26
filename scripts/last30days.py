@@ -394,6 +394,7 @@ def _run_supplemental(
     x_source: str,
     progress: ui.ProgressDisplay = None,
     skip_reddit: bool = False,
+    resolved_handle: str = None,
 ) -> tuple:
     """Run Phase 2 supplemental searches based on entities from Phase 1.
 
@@ -410,6 +411,7 @@ def _run_supplemental(
         x_source: 'bird' or 'xai'
         progress: Optional progress display
         skip_reddit: If True, skip Reddit supplemental (e.g. rate-limited)
+        resolved_handle: X handle resolved by the agent (without @), searched unfiltered
 
     Returns:
         Tuple of (supplemental_reddit, supplemental_x)
@@ -434,10 +436,19 @@ def _run_supplemental(
     has_handles = entities["x_handles"] and x_source == "bird"
     has_subs = entities["reddit_subreddits"] and not skip_reddit
 
-    if not has_handles and not has_subs:
+    # Check if resolved handle is new (not already in extracted entities)
+    has_resolved = (
+        resolved_handle
+        and x_source == "bird"
+        and resolved_handle.lower() not in {h.lower() for h in entities["x_handles"]}
+    )
+
+    if not has_handles and not has_subs and not has_resolved:
         return [], []
 
     parts = []
+    if has_resolved:
+        parts.append(f"@{resolved_handle} (resolved)")
     if has_handles:
         parts.append(f"@{', @'.join(entities['x_handles'][:3])}")
     if has_subs:
@@ -458,8 +469,10 @@ def _run_supplemental(
     # Run supplemental searches in parallel
     reddit_future = None
     x_future = None
+    resolved_future = None
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    max_workers = sum([has_subs, has_handles, has_resolved])
+    with ThreadPoolExecutor(max_workers=max(max_workers, 1)) as executor:
         if has_subs:
             reddit_future = executor.submit(
                 openai_reddit.search_subreddits,
@@ -477,6 +490,16 @@ def _run_supplemental(
                 topic,
                 from_date,
                 count_per,
+            )
+
+        if has_resolved:
+            # Resolved handle: search unfiltered (topic=None) to get all recent posts
+            resolved_future = executor.submit(
+                bird_x.search_handles,
+                [resolved_handle],
+                None,  # No topic filter - get all recent activity
+                from_date,
+                10,  # More results for the topic entity
             )
 
         if reddit_future:
@@ -504,6 +527,24 @@ def _run_supplemental(
             except Exception as e:
                 sys.stderr.write(f"[Phase 2] Supplemental X error: {e}\n")
 
+        if resolved_future:
+            try:
+                raw_resolved = resolved_future.result(timeout=30)
+                # Lower relevance for unfiltered handle posts (no topic keyword signal)
+                for item in raw_resolved:
+                    item["relevance"] = 0.5
+                resolved_new = [
+                    item for item in raw_resolved
+                    if item.get("url", "") not in existing_urls
+                ]
+                supplemental_x.extend(resolved_new)
+                if resolved_new:
+                    sys.stderr.write(f"[Phase 2] +{len(resolved_new)} from @{resolved_handle}\n")
+            except TimeoutError:
+                sys.stderr.write(f"[Phase 2] Resolved handle @{resolved_handle} timed out (30s)\n")
+            except Exception as e:
+                sys.stderr.write(f"[Phase 2] Resolved handle error: {e}\n")
+
     if supplemental_reddit or supplemental_x:
         sys.stderr.write(
             f"[Phase 2] +{len(supplemental_reddit)} Reddit, +{len(supplemental_x)} X\n"
@@ -526,6 +567,7 @@ def run_research(
     x_source: str = "xai",
     run_youtube: bool = False,
     timeouts: dict = None,
+    resolved_handle: str = None,
 ) -> tuple:
     """Run the research pipeline.
 
@@ -819,6 +861,7 @@ def run_research(
             topic, reddit_items, x_items,
             from_date, to_date, depth, x_source, progress,
             skip_reddit=rate_limited,
+            resolved_handle=resolved_handle,
         )
         if sup_reddit:
             reddit_items.extend(sup_reddit)
@@ -895,6 +938,13 @@ def main():
         default=None,
         metavar="SECS",
         help="Global timeout in seconds (default: 180, quick: 90, deep: 300)",
+    )
+    parser.add_argument(
+        "--x-handle",
+        type=str,
+        default=None,
+        metavar="HANDLE",
+        help="Resolved X handle for topic entity (without @). Searched unfiltered in Phase 2.",
     )
 
     args = parser.parse_args()
@@ -1062,6 +1112,7 @@ def main():
         x_source=x_source or "xai",
         run_youtube=has_ytdlp,
         timeouts=timeouts,
+        resolved_handle=args.x_handle,
     )
 
     # Processing phase
@@ -1139,6 +1190,7 @@ def main():
     report.youtube_error = youtube_error
     report.hackernews_error = hackernews_error
     report.web_error = web_error
+    report.resolved_x_handle = args.x_handle
 
     # Generate context snippet
     report.context_snippet_md = render.render_context_snippet(report)

@@ -288,6 +288,8 @@ class Report:
     web_error: Optional[str] = None
     youtube_error: Optional[str] = None
     hackernews_error: Optional[str] = None
+    # Handle resolution
+    resolved_x_handle: Optional[str] = None
     # Cache info
     from_cache: bool = False
     cache_age_hours: Optional[float] = None
@@ -312,6 +314,8 @@ class Report:
             'prompt_pack': self.prompt_pack,
             'context_snippet_md': self.context_snippet_md,
         }
+        if self.resolved_x_handle:
+            d['resolved_x_handle'] = self.resolved_x_handle
         if self.reddit_error:
             d['reddit_error'] = self.reddit_error
         if self.x_error:
@@ -472,6 +476,7 @@ class Report:
             web_error=data.get('web_error'),
             youtube_error=data.get('youtube_error'),
             hackernews_error=data.get('hackernews_error'),
+            resolved_x_handle=data.get('resolved_x_handle'),
             from_cache=data.get('from_cache', False),
             cache_age_hours=data.get('cache_age_hours'),
         )

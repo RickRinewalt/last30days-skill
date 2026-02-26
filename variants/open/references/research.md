@@ -31,12 +31,24 @@ Research typically takes 2-8 minutes. Starting now.
 
 ---
 
+## Step 0.5: Resolve X Handle (if topic is a person/brand)
+
+If TOPIC looks like a **person, creator, brand, or specific account** (1-3 words, proper noun), do ONE quick WebSearch:
+
+```
+WebSearch("{TOPIC} X twitter handle")
+```
+
+Extract their X handle from results (look for `x.com/{handle}` URLs or "@handle" mentions). If found, pass it to the script as `--x-handle={handle}` (no @). Skip if TOPIC is generic, already has @, or uses `--quick`.
+
+---
+
 ## Research Execution
 
 **Step 1: Run the research script (FOREGROUND)**
 
 ```bash
-python3 "${SKILL_ROOT}/scripts/last30days.py" "$ARGUMENTS" --emit=compact --store 2>&1
+python3 "${SKILL_ROOT}/scripts/last30days.py" "$ARGUMENTS" --emit=compact --store 2>&1  # Add --x-handle=HANDLE if resolved
 ```
 
 Use a **timeout of 300000** (5 minutes). The `--store` flag persists findings for watchlist/briefing integration.

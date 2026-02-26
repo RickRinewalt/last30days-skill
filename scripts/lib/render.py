@@ -117,6 +117,8 @@ def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "
         lines.append(f"**OpenAI Model:** {report.openai_model_used}")
     if report.xai_model_used:
         lines.append(f"**xAI Model:** {report.xai_model_used}")
+    if report.resolved_x_handle:
+        lines.append(f"**Resolved X Handle:** @{report.resolved_x_handle}")
     lines.append("")
 
     # Coverage note for partial coverage
@@ -330,7 +332,10 @@ def render_source_status(report: schema.Report, source_info: dict = None) -> str
     if report.x_error:
         lines.append(f"  ❌ X: error — {report.x_error}")
     elif report.x:
-        lines.append(f"  ✅ X: {len(report.x)} posts")
+        x_line = f"  ✅ X: {len(report.x)} posts"
+        if report.resolved_x_handle:
+            x_line += f" (via @{report.resolved_x_handle} + keyword search)"
+        lines.append(x_line)
     elif report.mode in ("both", "x-only", "all", "x-web"):
         lines.append("  ⚠️ X: 0 posts found")
     else:
