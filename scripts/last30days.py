@@ -617,7 +617,7 @@ def _search_web(
         Tuple of (web_items, web_error)
         web_items are raw dicts ready for websearch.normalize_websearch_items()
     """
-    from lib import brave_search, parallel_search, openrouter_search
+    from lib import brave_search, parallel_search, openrouter_search, perplexity_search, tavily_search
 
     backend = env.get_web_search_source(config)
     if not backend:
@@ -631,11 +631,19 @@ def _search_web(
             raw_results = parallel_search.search_web(
                 topic, from_date, to_date, config["PARALLEL_API_KEY"], depth=depth,
             )
+        elif backend == "tavily":
+            raw_results = tavily_search.search_web(
+                topic, from_date, to_date, config["TAVILY_API_KEY"], depth=depth,
+            )
         elif backend == "brave":
             use_llm_ctx = os.environ.get("BRAVE_LLM_CONTEXT", "").strip() == "1"
             raw_results = brave_search.search_web(
                 topic, from_date, to_date, config["BRAVE_API_KEY"],
                 depth=depth, use_llm_context=use_llm_ctx,
+            )
+        elif backend == "perplexity":
+            raw_results = perplexity_search.search_web(
+                topic, from_date, to_date, config["PERPLEXITY_API_KEY"], depth=depth,
             )
         elif backend == "openrouter":
             raw_results = openrouter_search.search_web(
@@ -1584,6 +1592,7 @@ def main():
             "polymarket": True,
             "web_search_backend": web_source,
             "parallel_ai": bool(config.get("PARALLEL_API_KEY")),
+            "tavily": bool(config.get("TAVILY_API_KEY")),
             "brave": bool(config.get("BRAVE_API_KEY")),
             "openrouter": bool(config.get("OPENROUTER_API_KEY")),
         }
@@ -1911,7 +1920,7 @@ def main():
             f"(base: {env.get_xiaohongshu_api_base(config)})"
         )
     if not web_source:
-        source_info["web_skip_reason"] = "assistant will use WebSearch (add BRAVE_API_KEY for native search)"
+        source_info["web_skip_reason"] = "assistant will use WebSearch (add TAVILY_API_KEY or BRAVE_API_KEY for native search)"
 
     # Output result
     output_result(report, args.emit, web_needed, args.topic, from_date, to_date, missing_keys, args.days, source_info)
